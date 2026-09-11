@@ -848,7 +848,7 @@ export class YoAPI {
         });
     }
 
-    /** Verify the RSA-SHA256 signature on a payment notification against the Yo public certificate. */
+    /** Verify the RSA-SHA1 signature on a payment notification against the Yo public certificate. */
     protected verifyPaymentNotification(body: PaymentNotificationBody): boolean {
         const data =
             (body.date_time ?? "") +
@@ -861,7 +861,7 @@ export class YoAPI {
         return this.verifySignature(data, body.signature);
     }
 
-    /** Verify the RSA-SHA256 signature on a payment failure notification against the Yo public certificate. */
+    /** Verify the RSA-SHA1 signature on a payment failure notification against the Yo public certificate. */
     protected verifyPaymentFailureNotification(body: PaymentFailureNotificationBody): boolean {
         const data = (body.failed_transaction_reference ?? "") + (body.transaction_init_date ?? "");
 
@@ -878,7 +878,12 @@ export class YoAPI {
         if (publicKey === null) return false;
 
         try {
-            return rsaVerify("sha256", Buffer.from(data, "utf-8"), publicKey, Buffer.from(signatureBase64, "base64"));
+            const dataBuf = Buffer.from(data, "utf-8");
+            const sigBuf = Buffer.from(signatureBase64, "base64");
+            // PHP parity: openssl_verify() defaults to SHA1, and the live gateway
+            // signs with SHA1 (verified 2026-09-11 against production cert).
+            // Keep SHA256 as fallback in case Yo migrates.
+            return rsaVerify("sha1", dataBuf, publicKey, sigBuf) || rsaVerify("sha256", dataBuf, publicKey, sigBuf);
         } catch {
             return false;
         }

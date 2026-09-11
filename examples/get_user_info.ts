@@ -3,10 +3,9 @@ import { createClientFromEnv } from "./shared.ts";
 
 
 async function getUserInfo(api: YoAPI) {
-    const userInfo = await api.acGetMsisdnKycInfo("256703752696");
+    const userInfo = await api.acGetMsisdnKycInfo("256770000000");
     return userInfo;
 }
-
 
 if (import.meta.main) {
     console.log(await getUserInfo(createClientFromEnv()));
