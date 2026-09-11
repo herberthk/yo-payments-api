@@ -1,17 +1,18 @@
-# yo-api-ts
+# @herberthtk/yo-payments-api
 
-TypeScript port of the [Yo! Payments API PHP library](https://github.com/YO-Uganda) (`YoAPI.php`) for mobile money, airtime and account operations on the Yo! Payments gateway. Runs on [Bun](https://bun.com) (uses `fetch` + `node:crypto`, so it works in Node 18+ too).
+TypeScript client for the [Yo! Payments API PHP library](https://github.com/YO-Uganda) (`YoAPI.php`) for mobile money, airtime and account operations on the Yo! Payments gateway. Runs on [Bun](https://bun.com) and Node.js 18+ (uses `fetch` + `node:crypto`), including Next.js App Router handlers, Server Actions and Server Components (**server-side only** — never import it into a Client Component).
 
 ## Install
 
 ```bash
-bun install
+npm install @herberthtk/yo-payments-api
+# or: bun add @herberthtk/yo-payments-api
 ```
 
 ## Usage
 
 ```ts
-import { YoAPI } from "./index.ts";
+import { YoAPI } from "@herberthtk/yo-payments-api";
 
 // production by default; pass "sandbox" as the third argument for sandbox mode
 const yoAPI = new YoAPI("API_USERNAME", "API_PASSWORD");
@@ -80,12 +81,85 @@ yoAPI.generatePublicKeyAuthenticationSignature("256770000000", 5000, "Salary pay
 const res = await yoAPI.acWithdrawFunds("256770000000", 5000, "Salary payout");
 ```
 
+### Usage in Next.js (App Router)
+
+The library is **server-only**: it uses `node:crypto`/`node:fs` and handles API secrets. Add `import "server-only"` (`npm i server-only`) at the top of every file that touches it, keep credentials in server-side env vars (never `NEXT_PUBLIC_*`), and pin `export const runtime = "nodejs"` on route handlers. Ready-to-copy handlers live in `examples/nextjs/`:
+
+```bash
+npm install @herberthtk/yo-payments-api server-only
+```
+
+```ts
+// lib/yo.ts
+import "server-only";
+import { YoAPI } from "@herberthtk/yo-payments-api";
+
+export function getYoClient() {
+    return new YoAPI(process.env.YO_API_USERNAME!, process.env.YO_API_PASSWORD!, "sandbox");
+}
+```
+
+```ts
+// app/api/yo/ipn/route.ts — register this URL as your InstantNotificationUrl
+import "server-only";
+import { getYoClient } from "@/lib/yo";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function POST(req: Request) {
+    const form = await req.formData();
+    const body: Record<string, string> = {};
+    for (const [k, v] of form.entries()) if (typeof v === "string") body[k] = v;
+
+    const payment = getYoClient().receivePaymentNotification({
+        date_time: body.date_time ?? "",
+        amount: body.amount ?? "",
+        narrative: body.narrative ?? "",
+        network_ref: body.network_ref ?? "",
+        external_ref: body.external_ref ?? "",
+        msisdn: body.msisdn ?? "",
+        signature: body.signature ?? "",
+    });
+    if (!payment.is_verified) return new Response("NOT VERIFIED", { status: 400 });
+
+    // TODO: persist + mark processed idempotently on payment.external_ref
+    return new Response("OK");
+}
+```
+
+```ts
+// app/actions.ts — deposits from a Client Component form action
+"use server";
+import { getYoClient } from "@/lib/yo";
+
+export async function requestDeposit(msisdn: string, amount: number, narrative: string) {
+    const api = getYoClient();
+    api.setExternalReference(`${Date.now()}`);
+    const res = await api.acDepositFunds(msisdn, amount, narrative);
+    if (res.Status === "OK") return { ok: true, reference: res.TransactionReference };
+    return { ok: false, message: res.StatusMessage };
+}
+```
+
+```tsx
+// app/statement/page.tsx — Server Component (all reads return JSON-safe data)
+import { getYoClient } from "@/lib/yo";
+
+export default async function StatementPage() {
+    const res = await getYoClient().acGetMinistatement(null, null, "SUCCEEDED", "UGX-MTNMM", 0);
+    return <pre>{JSON.stringify(res.Transactions, null, 2)}</pre>;
+}
+```
+
+Feature map: deposits/status checks → Server Actions (`examples/nextjs/lib/actions.ts`); balances/ministatements/KYC → Server Components or actions (`examples/nextjs/lib/queries.ts`); IPN + failure notices → Route Handlers (`examples/nextjs/app/api/yo/...`); payouts → Server Actions with `setPrivateKeyContent(process.env.YO_PRIVATE_KEY!.replace(/\\n/g, "\n"))` since serverless hosts have no key files. See `examples/nextjs/` for every operation, covered by `tests/nextjs.test.ts`.
+
 ### Error handling
 
 Transport-level and protocol-level failures throw `YoAPIError` (an `Error` subclass):
 
 ```ts
-import { YoAPI, YoAPIError } from "./index.ts";
+import { YoAPI, YoAPIError } from "@herberthtk/yo-payments-api";
 
 try {
     await yoAPI.acAcctBalance();
@@ -124,17 +198,24 @@ YO_API_USERNAME=... YO_API_PASSWORD=... YO_API_MODE=sandbox \
 - Response bodies are capped (`setMaxResponseBytes` / `getMaxResponseBytes`, default 1 MiB) and malformed/non-XML responses throw `YoAPIError` instead of degrading to empty results.
 - Pass money amounts as strings when exact formatting matters; numbers use JavaScript float-to-string conversion.
 - One `YoAPI` instance holds per-request state (`externalReference`, ...), so don't share an instance across concurrent requests — create one per request.
-- The Yo! Uganda public certificates (`certs/*.crt`, copied from the PHP package) are used to verify IPN signatures. Verification is fail-closed (`is_verified: false`) when the certificate is missing or invalid — monitor this, and handle IPNs idempotently on `external_ref` since notifications carry no replay protection.
+- The Yo! Uganda public certificates (`certs/*.crt`, copied from the PHP package) verify IPN signatures, with embedded copies as fallback when the files can't be resolved (bundled servers, CJS builds). Override with `setPublicKeyFileUrl`. Verification is fail-closed (`is_verified: false`) when the certificate is missing or invalid — monitor this, and handle IPNs idempotently on `external_ref` since notifications carry no replay protection.
+- `setPrivateKeyContent` accepts the signing key as PEM text (takes precedence over the file location) for hosts without a stable filesystem; on serverless, load it from an env var and unescape newlines.
 
 ## Develop
 
 ```bash
 bun install
-bun test          # run the test suite (mock gateway server + generated RSA keys; no real API calls)
-bun run index.ts
+bun test          # mock gateway server + generated RSA keys; no real API calls
+bun run typecheck # tsc --noEmit
+bun run build     # tsup → dist/ (ESM + CJS + .d.ts); regenerates src/embeddedCerts.ts first
+bunx attw --pack  # validate the packed types
 ```
 
-The suite (`tests/YoAPI.test.ts`, `tests/examples.test.ts`) asserts byte-exact request XML for every operation, response parsing, signature round-trips and all six ported examples. `tsc --noEmit` (via `bun run typecheck`) must also pass.
+The suite (`tests/YoAPI.test.ts`, `tests/examples.test.ts`, `tests/keys.test.ts`, `tests/nextjs.test.ts`) asserts byte-exact request XML for every operation, response parsing, signature round-trips, key/cert handling and all examples. `tsc --noEmit` must also pass.
+
+### Releasing (maintainers)
+
+Versions follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:` → minor, `fix:` → patch, `feat!:`/`BREAKING CHANGE:` → major). To cut a release, run **Actions → Release → Run workflow** — release-it bumps the version, updates `CHANGELOG.md`, tags, creates the GitHub release and publishes to npm via trusted publishing (no npm token needed). First-time setup only: `npm login` + one manual `npm publish --access public`, then register the repo as a trusted publisher in the npm package settings.
 
 ## Project structure
 
@@ -143,9 +224,13 @@ The suite (`tests/YoAPI.test.ts`, `tests/examples.test.ts`) asserts byte-exact r
 - `src/errors.ts` — `YoAPIError`
 - `src/xml.ts` — request building, response parsing and PHP-parity mapping helpers
 - `src/http.ts` — gateway POST transport (timeout, TLS, size cap, error mapping)
-- `src/keys.ts` — cached verification-key loading
+- `src/keys.ts` — cached verification-key loading (file-first, embedded fallback)
 - `src/constants.ts` — gateway URLs, certificate names, defaults
+- `src/embeddedCerts.ts` — auto-generated from `certs/` (`bun run embed-certs`)
 - `examples/` — runnable ports of the six PHP examples
+- `examples/nextjs/` — Next.js App Router handlers, Server Actions and queries
 - `certs/` — Yo! Uganda public certificates for IPN verification
+- `.github/workflows/` — `ci.yml` (test/typecheck/build/pack-check) and `release.yml` (release-it via trusted publishing)
+- `scripts/embed-certs.ts` — regenerates `src/embeddedCerts.ts`
 
 This project was created using `bun init` in bun v1.4.0. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
