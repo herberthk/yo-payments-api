@@ -202,6 +202,164 @@ const res = await yoAPI.acWithdrawFunds(msisdn, amount, narrative);
 
 Signs `username + amount + msisdn + narrative + externalReference + nonce` (SHA1+RSA per the gateway protocol) and stores it for the next payout call. Throws `"Public key authentication nonce is not set…"`, `"Private key file location cannot be NULL"`, `"Private key file could not be opened…"`, or `"Private key is invalid"`.
 
+### Response examples
+
+Concrete objects each call resolves to. Absent optional fields are omitted (never `null`).
+
+**Deposits, transfers, airtime, withdrawals** (`DepositFundsResponse` family) — success:
+```ts
+{
+  Status: "OK",
+  StatusCode: "200",
+  StatusMessage: "OK",
+  TransactionStatus: "SUCCEEDED",
+  TransactionReference: "TRX-EX-1",
+  MNOTransactionReferenceId: "MNO-9",
+  IssuedReceiptNumber: "R-77",
+}
+```
+
+Same calls — business failure (returned, not thrown):
+```ts
+{
+  Status: "FAILED",
+  StatusCode: "500",
+  StatusMessage: "Failed",
+  TransactionStatus: "FAILED",
+  ErrorMessageCode: "INVALID_MSISDN",
+  ErrorMessage: "The MSISDN is invalid",
+}
+```
+
+**Transaction status** (`TransactionCheckStatusResponse`) — success carries the money fields:
+```ts
+{
+  Status: "OK",
+  StatusCode: "200",
+  StatusMessage: "OK",
+  TransactionStatus: "SUCCEEDED",
+  TransactionReference: "TRX-EX-1",
+  Amount: "10000",
+  AmountFormatted: "UGX 10,000",
+  CurrencyCode: "UGX",
+  TransactionInitiationDate: "2026-09-07T10:00:00",
+  TransactionCompletionDate: "2026-09-07T10:01:00",
+  IssuedReceiptNumber: "R-77",
+}
+```
+
+Still pending — keep polling:
+```ts
+{
+  Status: "OK",
+  StatusCode: "200",
+  StatusMessage: "OK",
+  TransactionStatus: "PENDING",
+}
+```
+
+**Balance** (`AcctBalanceResponse`):
+```ts
+{
+  Status: "OK",
+  StatusCode: "200",
+  balance: [
+    { code: "UGX", balance: "50000" },
+    { code: "UGX-MTNAT", balance: "1500" },
+  ],
+}
+```
+
+**Ministatement** (`MinistatementResponse`) — `Transactions` is always an array:
+```ts
+{
+  Status: "OK",
+  StatusCode: "200",
+  TotalTransactions: "2",
+  ReturnedTransactions: "2",
+  Transactions: [
+    {
+      TransactionSystemId: "SYS-1",
+      TransactionReference: "TRX-EX-1",
+      TransactionStatus: "SUCCEEDED",
+      InitiationDate: "2026-09-07 10:00:00",
+      CompletionDate: "2026-09-07 10:01:00",
+      NarrativeBase64: "SGVsbG8=",
+      Currency: "UGX",
+      Amount: "100",
+      Balance: "900",
+      GeneralType: "DEPOSIT",
+      DetailedType: "MOBILE_MONEY_DEPOSIT",
+      BeneficiaryMsisdn: "256770000000",
+      BeneficiaryBase64: "QmVuZQ==",
+      SenderMsisdn: "256780000000",
+      SenderBase64: "U2VuZGVy",
+      Base64TransactionExternalReference: "RVhULTE=",
+      TransactionEntryDesignation: "TRANSACTION",
+    },
+  ],
+}
+```
+
+**Airtimestock purchase** (`PurchaseAirtimeStockResponse`):
+```ts
+{
+  Status: "OK",
+  StatusCode: "200",
+  StatusMessage: "Purchased",
+  TransactionReference: "TRX-EX-1",
+  TotalCurrencyDebited: "1000",
+  CommissionAmount: "50",
+}
+```
+
+**KYC lookup** (`MsisdnKycInfoResponse`):
+```ts
+{
+  Status: "OK",
+  StatusCode: "200",
+  StatusMessage: "Found",
+  FirstName: "John",
+  MiddleName: "Middle",
+  Surname: "Doe",
+}
+```
+
+**Verified payment notification** (`PaymentNotificationResult`):
+```ts
+{
+  is_verified: true,
+  date_time: "2026-09-07 10:00:00",
+  amount: "1000",
+  narrative: "Payment",
+  network_ref: "NET-1",
+  external_ref: "EXT-1",
+  msisdn: "256770000000",
+}
+```
+
+Unverifiable notification (bad signature or cert problem) — credit nothing:
+```ts
+{
+  is_verified: false,
+  date_time: "2026-09-07 10:00:00",
+  amount: "9999",
+  narrative: "Payment",
+  network_ref: "NET-1",
+  external_ref: "EXT-1",
+  msisdn: "256770000000",
+}
+```
+
+**Transport failure** — thrown as `YoAPIError`, e.g. gateway HTTP 502:
+```ts
+// caught error instance:
+YoAPIError: Yo! Payments gateway responded with HTTP 502
+// e.status === 502
+// e.body === "<html><body>Bad Gateway</body></html>"
+// e.cause === undefined (set only for connection/timeout errors)
+```
+
 ## Usage cases
 
 **1. Blocking deposit** — simplest collection flow; the call returns after the subscriber approves:
