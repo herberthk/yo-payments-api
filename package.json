@@ -1,0 +1,80 @@
+{
+  "name": "@herberthtk/yo-payments-api",
+  "version": "0.1.0",
+  "description": "TypeScript client for the Yo! Payments mobile-money gateway (deposits, withdrawals, airtime, statements, IPN verification). Works in Node.js 18+, Bun, and Next.js (server-side).",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/herberthk/yo-payments-api.git"
+  },
+  "homepage": "https://github.com/herberthk/yo-payments-api#readme",
+  "bugs": {
+    "url": "https://github.com/herberthk/yo-payments-api/issues"
+  },
+  "keywords": [
+    "yo-payments",
+    "mobile-money",
+    "mtn",
+    "airtel",
+    "uganda",
+    "payments",
+    "ipn",
+    "typescript"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./certs/*": "./certs/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/",
+    "certs/",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.11.1"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@release-it/conventional-changelog": "^12.0.0",
+    "@types/bun": "latest",
+    "@types/node": "^22",
+    "conventional-changelog-conventionalcommits": "^10.4.0",
+    "release-it": "^21.0.2",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.2"
+  },
+  "scripts": {
+    "build": "tsup",
+    "prebuild": "bun run embed-certs",
+    "prepublishOnly": "bun run build",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "check:pack": "attw --pack",
+    "release": "release-it",
+    "embed-certs": "bun scripts/embed-certs.ts"
+  }
+}
