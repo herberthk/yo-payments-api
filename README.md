@@ -1,5 +1,9 @@
 # @herberthtk/yo-payments-api
 
+[![npm version](https://img.shields.io/npm/v/@herberthtk/yo-payments-api.svg)](https://www.npmjs.com/package/@herberthtk/yo-payments-api)
+[![CI](https://github.com/herberthk/yo-payments-api/actions/workflows/ci.yml/badge.svg)](https://github.com/herberthk/yo-payments-api/actions)
+[![license](https://img.shields.io/npm/l/@herberthtk/yo-payments-api.svg)](https://github.com/herberthk/yo-payments-api/blob/main/LICENSE)
+
 TypeScript client for the [Yo! Payments API PHP library](https://github.com/YO-Uganda) (`YoAPI.php`) for mobile money, airtime and account operations on the Yo! Payments gateway. Runs on [Bun](https://bun.com) and Node.js 18+ (uses `fetch` + `node:crypto`), including Next.js App Router handlers, Server Actions and Server Components (**server-side only** — never import it into a Client Component).
 
 ## Install
@@ -9,7 +13,7 @@ npm install @herberthtk/yo-payments-api
 # or: bun add @herberthtk/yo-payments-api
 ```
 
-## Usage
+## Quick start
 
 ```ts
 import { YoAPI } from "@herberthtk/yo-payments-api";
@@ -30,23 +34,221 @@ console.log(balance.balance); // [{ code: "UGX", balance: "50000" }, ...]
 
 All network methods are `async` and return typed response objects. Method names use idiomatic camelCase (e.g. `acDepositFunds`, `setExternalReference`, `getTransactionLimitAccountIdentifier`) — the one intentional divergence from the PHP library's `snake_case` names; the XML wire format is unchanged.
 
-### Available operations
+## Configuration
 
-- `acDepositFunds(msisdn, amount, narrative)`
-- `acTransactionCheckStatus(transactionReference, privateTransactionReference?)`
-- `acInternalTransfer(currencyCode, amount, beneficiaryAccount, beneficiaryEmail, narrative)`
-- `acAcctBalance()`
-- `acGetMinistatement(startDate?, endDate?, transactionStatus?, currencyCode?, resultSetLimit?, transactionEntryDesignation?, externalReference?)`
-- `acSendAirtimeMobile(msisdn, amount, narrative)`
-- `acSendAirtimeInternal(currencyCode, amount, beneficiaryAccount, beneficiaryEmail, narrative)`
-- `acWithdrawFunds(msisdn, amount, narrative)`
-- `acUserPurchaseAirtimestock(airtimeCurrencyCode, amount)`
-- `acGetMsisdnKycInfo(msisdn)`
-- `generatePublicKeyAuthenticationSignature(msisdn, amount, narrative)`
+```ts
+const yoAPI = new YoAPI(username: string, password: string, mode: "production" | "sandbox" = "production");
+```
+
+| Setter | Type | Default | Purpose |
+|---|---|---|---|
+| `setExternalReference` | `string \| null` | `null` | Your reference for the payment (e.g. invoice number); sent with most requests |
+| `setInternalReference` | `string \| null` | `null` | Reference to another Yo! Payments system transaction |
+| `setNonblocking` | `"TRUE" \| "FALSE"` | `"FALSE"` | `"TRUE"` returns immediately; poll status or use IPN URLs |
+| `setInstantNotificationUrl` | `string \| null` | `null` | URL POSTed on successful deposit (non-blocking flow) |
+| `setFailureNotificationUrl` | `string \| null` | `null` | URL POSTed on failed deposit (non-blocking flow) |
+| `setProviderReferenceText` | `string \| null` | `null` | Text appended to the subscriber's confirmation SMS |
+| `setAuthenticationSignatureBase64` | `string \| null` | `null` | Required for certain deposit requests (ask Yo! support) |
+| `setDepositTransactionType` | `"PULL" \| "PUSH"` | `"PULL"` | Which deposit flow `acTransactionCheckStatus` follows up on |
+| `setTransactionLimitAccountIdentifier` | `string \| null` | `null` | Ask your account administrator before using |
+| `setPublicKeyAuthenticationNonce` | `string \| null` | `null` | Unique-per-request nonce for public-key-auth payouts |
+| `setPublicKeyAuthenticationSignatureBase64` | `string \| null` | `null` | Usually set via `generatePublicKeyAuthenticationSignature` |
+| `setPrivateKeyFileLocation` | `string \| null` | `null` | Path to the signing private key (PEM file) |
+| `setPrivateKeyContent` | `string \| null` | `null` | Key PEM text; for serverless hosts without key files (wins over file location) |
+| `setPublicKeyFileUrl` | `string` | bundled cert | Certificate used to verify IPN signatures |
+| `setUrl` | `string` | gateway URL | Override the API endpoint (testing/proxies) |
+| `setTimeout` | `number` (ms) | `120000` | Request timeout; `<= 0` disables it |
+| `setTlsVerificationEnabled` | `boolean` | `true` | Only disable for testing against self-signed endpoints |
+| `setMaxResponseBytes` | `number` | `1048576` | Cap on gateway response bodies |
+
+Every setter has a matching getter (`getExternalReference()`, `getMode()`, …). One instance holds per-request state, so create a fresh client per request — never share one across concurrent operations.
+
+## API reference
+
+Conventions used below:
+
+- **Success** — `Status: "OK"` (and usually `TransactionStatus: "SUCCEEDED"`); reference fields are present.
+- **Business failure** — returned as a normal object, never thrown: `Status: "FAILED"` with `ErrorMessageCode` / `ErrorMessage` set. Check `Status` (and `TransactionStatus`) before trusting reference fields.
+- **Transport failure** — thrown as `YoAPIError`: connection errors, timeouts, non-2xx HTTP, oversized bodies, malformed XML, missing `<Response>`. See [Error handling](#error-handling).
+
+Amounts accept `number | string` — pass a string when exact formatting matters (e.g. `"100.50"`), since numbers use JavaScript float-to-string conversion. Phone numbers use international format without `+` (e.g. `"256770000000"`).
+
+### acDepositFunds — request a mobile money deposit (USSD PIN prompt)
+
+```ts
+const res: DepositFundsResponse = await yoAPI.acDepositFunds(msisdn, amount, narrative);
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `msisdn` | `string` | Subscriber phone, e.g. `"256770000000"` |
+| `amount` | `number \| string` | Amount to collect |
+| `narrative` | `string` | Reason shown to the subscriber |
+
+Response (`DepositFundsResponse`): `Status`, `StatusCode`, `StatusMessage`, `TransactionStatus` always present. On success also `TransactionReference` (save this — it identifies the payment everywhere else), `MNOTransactionReferenceId`, `IssuedReceiptNumber`. On business failure, `ErrorMessageCode` / `ErrorMessage` instead. Optional request tweaks: `setNonblocking("TRUE")` + IPN URLs, `setAuthenticationSignatureBase64`.
+
+### acTransactionCheckStatus — poll a transaction
+
+```ts
+const res: TransactionCheckStatusResponse = await yoAPI.acTransactionCheckStatus(
+    transactionReference: string | null,
+    privateTransactionReference: string | null = null,
+);
+```
+
+Pass the gateway `TransactionReference`, or `null` plus the `ExternalReference` you sent (`privateTransactionReference`). `setDepositTransactionType("PUSH")` first when following up a push deposit. Same base fields as deposits, plus (when available): `Amount`, `AmountFormatted`, `CurrencyCode`, `TransactionInitiationDate`, `TransactionCompletionDate`. `TransactionStatus` is one of `SUCCEEDED`, `PENDING`, `FAILED`, `INDETERMINATE` — poll until it leaves `PENDING`.
+
+### acInternalTransfer — pay another Yo! Payments account
+
+```ts
+const res: DepositFundsResponse = await yoAPI.acInternalTransfer(
+    currencyCode: string,      // e.g. "UGX-MTNMM", "UGX-MTNAT", "UGX-WTLAT", "UGX-OULAT", "UGX-AIRAT"
+    amount: number | string,
+    beneficiaryAccount: number | string,  // recipient Yo! account number
+    beneficiaryEmail: string,
+    narrative: string,
+);
+```
+
+Same response shape as deposits (success/failure fields as above).
+
+### acAcctBalance — account balances
+
+```ts
+const res: AcctBalanceResponse = await yoAPI.acAcctBalance();
+// res.balance → [{ code: "UGX", balance: "50000" }, { code: "UGX-MTNAT", balance: "1500" }, ...]
+```
+
+`Status` / `StatusCode` always present, `balance` always an array (possibly empty), plus optional `StatusMessage` / error fields.
+
+### acGetMinistatement — transaction history
+
+```ts
+const res: MinistatementResponse = await yoAPI.acGetMinistatement(
+    startDate: string | null = null,       // "YYYY-MM-DD HH:MM:SS"
+    endDate: string | null = null,         // "YYYY-MM-DD HH:MM:SS"
+    transactionStatus: string | null = null, // "SUCCEEDED", "FAILED", "PENDING", "INDETERMINATE", or comma-joined
+    currencyCode: string | null = null,    // e.g. "UGX-MTNMM", "UGX-WARIDMM"
+    resultSetLimit: number | null = null,  // 0 returns all; gateway default is 15
+    transactionEntryDesignation = "ANY",    // "TRANSACTION" | "CHARGES" | "ANY"
+    externalReference: string | null = null,
+);
+```
+
+`Status`, `StatusCode`, `TotalTransactions`, `ReturnedTransactions` and `Transactions` always present. Each `TransactionDetail` carries `TransactionSystemId`, `TransactionReference`, `TransactionStatus`, `InitiationDate`, `CompletionDate`, `NarrativeBase64`, `Currency`, `Amount`, `Balance`, `GeneralType`, `DetailedType`, `BeneficiaryBase64`, `SenderBase64`, `TransactionEntryDesignation`, plus optional `BeneficiaryMsisdn`, `SenderMsisdn`, `Base64TransactionExternalReference` (present only when the gateway sends them).
+
+### acSendAirtimeMobile / acSendAirtimeInternal — send airtime
+
+```ts
+// to a phone number
+await yoAPI.acSendAirtimeMobile(msisdn, amount, narrative);
+// to another Yo! account ("UGX-MTNAT" | "UGX-WTLAT" | "UGX-OULAT" | "UGX-AIRAT")
+await yoAPI.acSendAirtimeInternal(currencyCode, amount, beneficiaryAccount, beneficiaryEmail, narrative);
+```
+
+Same response shape as deposits.
+
+### acWithdrawFunds — pay out to mobile money (handle with care)
+
+```ts
+const res: DepositFundsResponse = await yoAPI.acWithdrawFunds(msisdn, amount, narrative);
+```
+
+Same response shape as deposits. Requires an API Access Letter; some payouts additionally require public-key authentication — see below. Optional: `setTransactionLimitAccountIdentifier`, `setPublicKeyAuthenticationNonce` + `setPublicKeyAuthenticationSignatureBase64`.
+
+### acUserPurchaseAirtimestock — buy airtime stock with mobile money credit
+
+```ts
+const res: PurchaseAirtimeStockResponse = await yoAPI.acUserPurchaseAirtimestock(
+    airtimeCurrencyCode: string, // "UGX-MTNAT" | "UGX-AIRAT" | "UGX-OULAT" | "UGX-UTLAT" | "UGX-SMTAT"
+    amount: number | string,
+);
+```
+
+`Status` / `StatusCode` always present; on success `TransactionReference`, `TotalCurrencyDebited`, `CommissionAmount`, `StatusMessage`. (Parity note: your external reference is sent inside a `<TransactionReference>` tag, exactly like the PHP library.)
+
+### acGetMsisdnKycInfo — name lookup before paying out
+
+```ts
+const res: MsisdnKycInfoResponse = await yoAPI.acGetMsisdnKycInfo("256770000000");
+// res.FirstName / res.MiddleName / res.Surname when the gateway returns them
+```
+
+MTN Uganda and Airtel Uganda only; needs permission from support@yo.co.ug. `Status` / `StatusCode` always present.
+
+### receivePaymentNotification / receivePaymentFailureNotification — verify IPNs
+
+```ts
+const payment: PaymentNotificationResult = yoAPI.receivePaymentNotification({
+    date_time, amount, narrative, network_ref, external_ref, msisdn, signature,
+});
+// payment.is_verified === true → trust payment.msisdn / .amount / .external_ref / ...
+const failure: PaymentFailureNotificationResult = yoAPI.receivePaymentFailureNotification({
+    failed_transaction_reference, transaction_init_date, verification,
+});
+```
+
+Pass the parsed POST form body (PHP reads `$_POST`; here you supply it). Verification is RSA-SHA256 against the bundled Yo! certificate and is fail-closed: any problem (bad signature, missing cert) yields `is_verified: false`, never a throw. Always gate crediting on `is_verified` **and** dedupe on `external_ref` — notifications carry no replay protection.
+
+### generatePublicKeyAuthenticationSignature — sign a payout
+
+```ts
+yoAPI.setExternalReference("INV-123");
+yoAPI.setPublicKeyAuthenticationNonce(crypto.randomUUID()); // unique per request
+yoAPI.setPrivateKeyContent(process.env.YO_PRIVATE_KEY!.replace(/\\n/g, "\n")); // or setPrivateKeyFileLocation(path)
+yoAPI.generatePublicKeyAuthenticationSignature(msisdn, amount, narrative); // throws on missing/invalid key
+const res = await yoAPI.acWithdrawFunds(msisdn, amount, narrative);
+```
+
+Signs `username + amount + msisdn + narrative + externalReference + nonce` (SHA1+RSA per the gateway protocol) and stores it for the next payout call. Throws `"Public key authentication nonce is not set…"`, `"Private key file location cannot be NULL"`, `"Private key file could not be opened…"`, or `"Private key is invalid"`.
+
+## Usage cases
+
+**1. Blocking deposit** — simplest collection flow; the call returns after the subscriber approves:
+```ts
+const api = new YoAPI(u, p, "sandbox");
+api.setExternalReference(`INV-${Date.now()}`);
+const res = await api.acDepositFunds("256770000000", 10000, "Order payment");
+if (res.Status === "OK" && res.TransactionStatus === "SUCCEEDED") {
+    await markPaid(res.TransactionReference!);
+} else {
+    console.error(res.ErrorMessageCode, res.ErrorMessage);
+}
+```
+
+**2. Non-blocking deposit with IPN + polling fallback** — instant response, then confirm:
+```ts
+api.setNonblocking("TRUE");
+api.setInstantNotificationUrl("https://example.com/api/yo/ipn");
+api.setFailureNotificationUrl("https://example.com/api/yo/failure");
+const res = await api.acDepositFunds("256770000000", 10000, "Order payment");
+// ...meanwhile your IPN endpoint verifies and credits on payment.external_ref...
+// ...and/or poll until settled:
+for (;;) {
+    const st = await api.acTransactionCheckStatus(null, externalRef);
+    if (st.TransactionStatus !== "PENDING") break;
+    await new Promise((r) => setTimeout(r, 5000));
+}
+```
+
+**3. Daily reconciliation from the ministatement:**
+```ts
+const st = await api.acGetMinistatement("2026-09-10 00:00:00", "2026-09-10 23:59:59", "SUCCEEDED", "UGX-MTNMM", 0);
+for (const tx of st.Transactions) await reconcile(tx);
+```
+
+**4. Serverless payout with key material (no key files on Vercel/Lambda):**
+```ts
+api.setExternalReference("SAL-SEP-001");
+api.setPublicKeyAuthenticationNonce(crypto.randomUUID());
+api.setPrivateKeyContent(process.env.YO_PRIVATE_KEY!.replace(/\\n/g, "\n"));
+api.generatePublicKeyAuthenticationSignature("256770000000", 5000, "Payout");
+const res = await api.acWithdrawFunds("256770000000", 5000, "Payout");
+```
 
 ### Receiving payment notifications (IPN)
 
-PHP reads `$_POST` / `php://input` globals, which is impossible in TypeScript, so you pass the parsed form body yourself. Point `setUrl`-style config is not affected; use `setPublicKeyFileUrl` if you need a different certificate (sandbox vs production is picked automatically by the constructor `mode`).
+PHP reads `$_POST` / `php://input` globals, which is impossible in TypeScript, so you pass the parsed form body yourself. Use `setPublicKeyFileUrl` if you need a different certificate (sandbox vs production is picked automatically by the constructor `mode`).
 
 ```ts
 // Bun HTTP server example
@@ -68,17 +270,6 @@ Bun.serve({
         return new Response("OK");
     },
 });
-```
-
-### Public key authentication (payouts)
-
-```ts
-const yoAPI = new YoAPI("API_USERNAME", "API_PASSWORD");
-yoAPI.setExternalReference("INV-123");
-yoAPI.setPublicKeyAuthenticationNonce(crypto.randomUUID());
-yoAPI.setPrivateKeyFileLocation("/path/to/your-private-key.pem");
-yoAPI.generatePublicKeyAuthenticationSignature("256770000000", 5000, "Salary payout");
-const res = await yoAPI.acWithdrawFunds("256770000000", 5000, "Salary payout");
 ```
 
 ### Usage in Next.js (App Router)
@@ -170,16 +361,18 @@ try {
 }
 ```
 
-`YoAPIError` is thrown for connection errors, timeouts, non-2xx HTTP statuses, oversized bodies, malformed XML and responses missing the `<Response>` node. Gateway-level business failures (e.g. `Status: "FAILED"`) are still returned as normal response objects, exactly like the PHP library.
+`YoAPIError` fields: `message` (what failed), `status?: number` (HTTP status when a response was received), `body?: string` (first 500 chars of the response, when any), `cause?: unknown` (the underlying fetch error). Thrown for connection errors, timeouts, non-2xx HTTP statuses, oversized bodies, malformed XML and responses missing the `<Response>` node. Gateway-level business failures (e.g. `Status: "FAILED"`) are still returned as normal response objects, exactly like the PHP library.
 
 ### Examples
 
-The `examples/` directory ports all six PHP examples; each exports testable functions and is runnable with `bun run`:
+The `examples/` directory ports the PHP examples (plus balance and KYC extras); each exports testable functions and is runnable with `bun run`:
 
 ```bash
 YO_API_USERNAME=... YO_API_PASSWORD=... YO_API_MODE=sandbox bun run examples/deposit_funds.ts
 YO_API_USERNAME=... YO_API_PASSWORD=... YO_API_MODE=sandbox bun run examples/deposit_funds_nonblocking.ts
 YO_API_USERNAME=... YO_API_PASSWORD=... YO_API_MODE=sandbox bun run examples/get_ministatement.ts
+YO_API_USERNAME=... YO_API_PASSWORD=... YO_API_MODE=sandbox bun run examples/get_account_balance.ts
+YO_API_USERNAME=... YO_API_PASSWORD=... YO_API_MODE=sandbox bun run examples/get_user_info.ts
 YO_API_USERNAME=... YO_API_PASSWORD=... YO_API_MODE=sandbox \
   YO_PRIVATE_KEY_FILE=/path/to/private-key.pem \
   bun run examples/withdraw_funds_public_key_authentication.ts
@@ -227,7 +420,7 @@ Versions follow [Conventional Commits](https://www.conventionalcommits.org/) (`f
 - `src/keys.ts` — cached verification-key loading (file-first, embedded fallback)
 - `src/constants.ts` — gateway URLs, certificate names, defaults
 - `src/embeddedCerts.ts` — auto-generated from `certs/` (`bun run embed-certs`)
-- `examples/` — runnable ports of the six PHP examples
+- `examples/` — runnable ports of the PHP examples (plus balance and KYC extras)
 - `examples/nextjs/` — Next.js App Router handlers, Server Actions and queries
 - `certs/` — Yo! Uganda public certificates for IPN verification
 - `.github/workflows/` — `ci.yml` (test/typecheck/build/pack-check) and `release.yml` (release-it via trusted publishing)
