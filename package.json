@@ -1,6 +1,6 @@
 {
   "name": "@herberthtk/yo-payments-api",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "TypeScript client for the Yo! Payments mobile-money gateway (deposits, withdrawals, airtime, statements, IPN verification). Works in Node.js 18+, Bun, and Next.js (server-side).",
   "license": "MIT",
   "repository": {
