@@ -509,6 +509,7 @@ import "server-only";
 import { getYoClient } from "@/lib/yo";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   const form = await req.formData();
@@ -622,7 +623,7 @@ The suite (`tests/YoAPI.test.ts`, `tests/examples.test.ts`, `tests/keys.test.ts`
 
 ### Releasing (maintainers)
 
-Versions follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:` → minor, `fix:` → patch, `feat!:`/`BREAKING CHANGE:` → major). To cut a release, run **Actions → Release → Run workflow** — release-it bumps the version, updates `CHANGELOG.md`, tags, creates the GitHub release and publishes to npm via trusted publishing (no npm token needed).
+Versions follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:` → minor, `fix:` → patch, `feat!:`/`BREAKING CHANGE:` → major). Before the first release, configure npm trusted publishing for `@herberthtk/yo-payments-api` in npm package settings: select GitHub Actions, set the repository to `herberthk/yo-payments-api`, and set the workflow filename to `release.yml` (not its full path). See npm's [trusted publishers guide](https://docs.npmjs.com/trusted-publishers/) for the full setup. Then run **Actions → Release → Run workflow** — release-it bumps the version, updates `CHANGELOG.md`, tags, creates the GitHub release and publishes to npm via trusted publishing (no npm token needed).
 
 ## Project structure
 
