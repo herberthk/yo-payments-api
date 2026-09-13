@@ -75,6 +75,7 @@
     "typecheck": "tsc --noEmit",
     "check:pack": "attw --pack",
     "release": "release-it",
-    "embed-certs": "bun scripts/embed-certs.ts"
+    "embed-certs": "bun scripts/embed-certs.ts",
+    "publish":"npm publish --access public --provenance=false"
   }
 }

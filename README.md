@@ -216,7 +216,13 @@ const failure: PaymentFailureNotificationResult =
   });
 ```
 
-Pass the parsed POST form body (PHP reads `$_POST`; here you supply it). Verification is RSA-SHA256 against the bundled Yo! certificate and is fail-closed: any problem (bad signature, missing cert) yields `is_verified: false`, never a throw. Always gate crediting on `is_verified` **and** dedupe on `external_ref` — notifications carry no replay protection.
+Pass the parsed POST form body (PHP reads `$_POST`; here you supply it). Verification is RSA-SHA1 (with SHA256 fallback) against the bundled Yo! certificate and is fail-closed: any problem (bad signature, missing cert) yields `is_verified: false`, never a throw. Always gate crediting on `is_verified` **and** dedupe on `external_ref` — notifications carry no replay protection.
+
+> **Correlating webhooks to your DB (read this first):** neither callback carries the gateway `TransactionReference` from `acDepositFunds` — this matches the PHP library (`receive_payment_notification` / `receive_payment_failure_notification`) and is by gateway design, not a bug. Correlate on **your** `ExternalReference` instead:
+> - success IPN `external_ref` === the `ExternalReference` you sent via `setExternalReference()`
+> - failure IPN `failed_transaction_reference` === the same `ExternalReference` (not the gateway ref)
+>
+> Persist both at deposit time — `externalRef` (`@unique`, your idempotency/lookup key) **and** `yoTransactionReference` (for `acTransactionCheckStatus` polling / support). Then: `UPDATE ... WHERE externalRef = payment.external_ref` on success, `WHERE externalRef = failure.failed_transaction_reference` on failure. See "Usage cases" below for the full Prisma pattern.
 
 ### generatePublicKeyAuthenticationSignature — sign a payout
 
@@ -417,11 +423,16 @@ if (res.Status === "OK" && res.TransactionStatus === "SUCCEEDED") {
 **2. Non-blocking deposit with IPN + polling fallback** — instant response, then confirm:
 
 ```ts
+const externalRef = `INV-${Date.now()}`; // your idempotency key — persist BEFORE calling
+api.setExternalReference(externalRef);
 api.setNonblocking("TRUE");
 api.setInstantNotificationUrl("https://example.com/api/yo/ipn");
 api.setFailureNotificationUrl("https://example.com/api/yo/failure");
+// await db.yoTransaction.create({ data: { externalRef, msisdn, amount, status: "PENDING" } });
 const res = await api.acDepositFunds("256770000000", 10000, "Order payment");
+// await db.yoTransaction.update({ where: { externalRef }, data: { yoTransactionReference: res.TransactionReference } });
 // ...meanwhile your IPN endpoint verifies and credits on payment.external_ref...
+// ...failure endpoint marks FAILED on failure.failed_transaction_reference (=== externalRef, NOT the gateway TransactionReference)...
 // ...and/or poll until settled:
 for (;;) {
   const st = await api.acTransactionCheckStatus(null, externalRef);
@@ -471,11 +482,16 @@ Bun.serve({
       console.log(
         `Payment from ${payment.msisdn} of ${payment.amount} (ref ${payment.external_ref})`,
       );
-      // update your transaction status where external_ref = payment.external_ref
+      // update your transaction status where externalRef = payment.external_ref
+      // (payment.external_ref === the ExternalReference you sent — IPNs never carry the gateway TransactionReference)
     }
 
-    // Failure notifications:
+    // Failure notifications — same rule, different field name:
     // const failure = yoAPI.receivePaymentFailureNotification(body);
+    // if (failure.is_verified) {
+    //   // update where externalRef = failure.failed_transaction_reference
+    //   // (failed_transaction_reference === your ExternalReference, NOT res.TransactionReference)
+    // }
     return new Response("OK");
   },
 });
