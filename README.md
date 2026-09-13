@@ -22,9 +22,13 @@ import { YoAPI } from "@herberthtk/yo-payments-api";
 const yoAPI = new YoAPI("API_USERNAME", "API_PASSWORD");
 
 // Request a mobile money user to deposit funds into your account
-const response = await yoAPI.acDepositFunds("256770000000", 10000, "Reason for transfer of funds");
+const response = await yoAPI.acDepositFunds(
+  "256770000000",
+  10000,
+  "Reason for transfer of funds",
+);
 if (response.Status === "OK") {
-    console.log("Transaction Reference =", response.TransactionReference);
+  console.log("Transaction Reference =", response.TransactionReference);
 }
 
 // Check the balance of your account
@@ -40,26 +44,26 @@ All network methods are `async` and return typed response objects. Method names 
 const yoAPI = new YoAPI(username: string, password: string, mode: "production" | "sandbox" = "production");
 ```
 
-| Setter | Type | Default | Purpose |
-|---|---|---|---|
-| `setExternalReference` | `string \| null` | `null` | Your reference for the payment (e.g. invoice number); sent with most requests |
-| `setInternalReference` | `string \| null` | `null` | Reference to another Yo! Payments system transaction |
-| `setNonblocking` | `"TRUE" \| "FALSE"` | `"FALSE"` | `"TRUE"` returns immediately; poll status or use IPN URLs |
-| `setInstantNotificationUrl` | `string \| null` | `null` | URL POSTed on successful deposit (non-blocking flow) |
-| `setFailureNotificationUrl` | `string \| null` | `null` | URL POSTed on failed deposit (non-blocking flow) |
-| `setProviderReferenceText` | `string \| null` | `null` | Text appended to the subscriber's confirmation SMS |
-| `setAuthenticationSignatureBase64` | `string \| null` | `null` | Required for certain deposit requests (ask Yo! support) |
-| `setDepositTransactionType` | `"PULL" \| "PUSH"` | `"PULL"` | Which deposit flow `acTransactionCheckStatus` follows up on |
-| `setTransactionLimitAccountIdentifier` | `string \| null` | `null` | Ask your account administrator before using |
-| `setPublicKeyAuthenticationNonce` | `string \| null` | `null` | Unique-per-request nonce for public-key-auth payouts |
-| `setPublicKeyAuthenticationSignatureBase64` | `string \| null` | `null` | Usually set via `generatePublicKeyAuthenticationSignature` |
-| `setPrivateKeyFileLocation` | `string \| null` | `null` | Path to the signing private key (PEM file) |
-| `setPrivateKeyContent` | `string \| null` | `null` | Key PEM text; for serverless hosts without key files (wins over file location) |
-| `setPublicKeyFileUrl` | `string` | bundled cert | Certificate used to verify IPN signatures |
-| `setUrl` | `string` | gateway URL | Override the API endpoint (testing/proxies) |
-| `setTimeout` | `number` (ms) | `120000` | Request timeout; `<= 0` disables it |
-| `setTlsVerificationEnabled` | `boolean` | `true` | Only disable for testing against self-signed endpoints |
-| `setMaxResponseBytes` | `number` | `1048576` | Cap on gateway response bodies |
+| Setter                                      | Type                | Default      | Purpose                                                                        |
+| ------------------------------------------- | ------------------- | ------------ | ------------------------------------------------------------------------------ |
+| `setExternalReference`                      | `string \| null`    | `null`       | Your reference for the payment (e.g. invoice number); sent with most requests  |
+| `setInternalReference`                      | `string \| null`    | `null`       | Reference to another Yo! Payments system transaction                           |
+| `setNonblocking`                            | `"TRUE" \| "FALSE"` | `"FALSE"`    | `"TRUE"` returns immediately; poll status or use IPN URLs                      |
+| `setInstantNotificationUrl`                 | `string \| null`    | `null`       | URL POSTed on successful deposit (non-blocking flow)                           |
+| `setFailureNotificationUrl`                 | `string \| null`    | `null`       | URL POSTed on failed deposit (non-blocking flow)                               |
+| `setProviderReferenceText`                  | `string \| null`    | `null`       | Text appended to the subscriber's confirmation SMS                             |
+| `setAuthenticationSignatureBase64`          | `string \| null`    | `null`       | Required for certain deposit requests (ask Yo! support)                        |
+| `setDepositTransactionType`                 | `"PULL" \| "PUSH"`  | `"PULL"`     | Which deposit flow `acTransactionCheckStatus` follows up on                    |
+| `setTransactionLimitAccountIdentifier`      | `string \| null`    | `null`       | Ask your account administrator before using                                    |
+| `setPublicKeyAuthenticationNonce`           | `string \| null`    | `null`       | Unique-per-request nonce for public-key-auth payouts                           |
+| `setPublicKeyAuthenticationSignatureBase64` | `string \| null`    | `null`       | Usually set via `generatePublicKeyAuthenticationSignature`                     |
+| `setPrivateKeyFileLocation`                 | `string \| null`    | `null`       | Path to the signing private key (PEM file)                                     |
+| `setPrivateKeyContent`                      | `string \| null`    | `null`       | Key PEM text; for serverless hosts without key files (wins over file location) |
+| `setPublicKeyFileUrl`                       | `string`            | bundled cert | Certificate used to verify IPN signatures                                      |
+| `setUrl`                                    | `string`            | gateway URL  | Override the API endpoint (testing/proxies)                                    |
+| `setTimeout`                                | `number` (ms)       | `120000`     | Request timeout; `<= 0` disables it                                            |
+| `setTlsVerificationEnabled`                 | `boolean`           | `true`       | Only disable for testing against self-signed endpoints                         |
+| `setMaxResponseBytes`                       | `number`            | `1048576`    | Cap on gateway response bodies                                                 |
 
 Every setter has a matching getter (`getExternalReference()`, `getMode()`, …). One instance holds per-request state, so create a fresh client per request — never share one across concurrent operations.
 
@@ -76,14 +80,18 @@ Amounts accept `number | string` — pass a string when exact formatting matters
 ### acDepositFunds — request a mobile money deposit (USSD PIN prompt)
 
 ```ts
-const res: DepositFundsResponse = await yoAPI.acDepositFunds(msisdn, amount, narrative);
+const res: DepositFundsResponse = await yoAPI.acDepositFunds(
+  msisdn,
+  amount,
+  narrative,
+);
 ```
 
-| Parameter | Type | Description |
-|---|---|---|
-| `msisdn` | `string` | Subscriber phone, e.g. `"256770000000"` |
-| `amount` | `number \| string` | Amount to collect |
-| `narrative` | `string` | Reason shown to the subscriber |
+| Parameter   | Type               | Description                             |
+| ----------- | ------------------ | --------------------------------------- |
+| `msisdn`    | `string`           | Subscriber phone, e.g. `"256770000000"` |
+| `amount`    | `number \| string` | Amount to collect                       |
+| `narrative` | `string`           | Reason shown to the subscriber          |
 
 Response (`DepositFundsResponse`): `Status`, `StatusCode`, `StatusMessage`, `TransactionStatus` always present. On success also `TransactionReference` (save this — it identifies the payment everywhere else), `MNOTransactionReferenceId`, `IssuedReceiptNumber`. On business failure, `ErrorMessageCode` / `ErrorMessage` instead. Optional request tweaks: `setNonblocking("TRUE")` + IPN URLs, `setAuthenticationSignatureBase64`.
 
@@ -143,7 +151,13 @@ const res: MinistatementResponse = await yoAPI.acGetMinistatement(
 // to a phone number
 await yoAPI.acSendAirtimeMobile(msisdn, amount, narrative);
 // to another Yo! account ("UGX-MTNAT" | "UGX-WTLAT" | "UGX-OULAT" | "UGX-AIRAT")
-await yoAPI.acSendAirtimeInternal(currencyCode, amount, beneficiaryAccount, beneficiaryEmail, narrative);
+await yoAPI.acSendAirtimeInternal(
+  currencyCode,
+  amount,
+  beneficiaryAccount,
+  beneficiaryEmail,
+  narrative,
+);
 ```
 
 Same response shape as deposits.
@@ -151,7 +165,11 @@ Same response shape as deposits.
 ### acWithdrawFunds — pay out to mobile money (handle with care)
 
 ```ts
-const res: DepositFundsResponse = await yoAPI.acWithdrawFunds(msisdn, amount, narrative);
+const res: DepositFundsResponse = await yoAPI.acWithdrawFunds(
+  msisdn,
+  amount,
+  narrative,
+);
 ```
 
 Same response shape as deposits. Requires an API Access Letter; some payouts additionally require public-key authentication — see below. Optional: `setTransactionLimitAccountIdentifier`, `setPublicKeyAuthenticationNonce` + `setPublicKeyAuthenticationSignatureBase64`.
@@ -170,7 +188,8 @@ const res: PurchaseAirtimeStockResponse = await yoAPI.acUserPurchaseAirtimestock
 ### acGetMsisdnKycInfo — name lookup before paying out
 
 ```ts
-const res: MsisdnKycInfoResponse = await yoAPI.acGetMsisdnKycInfo("256770000000");
+const res: MsisdnKycInfoResponse =
+  await yoAPI.acGetMsisdnKycInfo("256770000000");
 // res.FirstName / res.MiddleName / res.Surname when the gateway returns them
 ```
 
@@ -180,12 +199,21 @@ MTN Uganda and Airtel Uganda only; needs permission from support@yo.co.ug. `Stat
 
 ```ts
 const payment: PaymentNotificationResult = yoAPI.receivePaymentNotification({
-    date_time, amount, narrative, network_ref, external_ref, msisdn, signature,
+  date_time,
+  amount,
+  narrative,
+  network_ref,
+  external_ref,
+  msisdn,
+  signature,
 });
 // payment.is_verified === true → trust payment.msisdn / .amount / .external_ref / ...
-const failure: PaymentFailureNotificationResult = yoAPI.receivePaymentFailureNotification({
-    failed_transaction_reference, transaction_init_date, verification,
-});
+const failure: PaymentFailureNotificationResult =
+  yoAPI.receivePaymentFailureNotification({
+    failed_transaction_reference,
+    transaction_init_date,
+    verification,
+  });
 ```
 
 Pass the parsed POST form body (PHP reads `$_POST`; here you supply it). Verification is RSA-SHA256 against the bundled Yo! certificate and is fail-closed: any problem (bad signature, missing cert) yields `is_verified: false`, never a throw. Always gate crediting on `is_verified` **and** dedupe on `external_ref` — notifications carry no replay protection.
@@ -207,6 +235,7 @@ Signs `username + amount + msisdn + narrative + externalReference + nonce` (SHA1
 Concrete objects each call resolves to. Absent optional fields are omitted (never `null`).
 
 **Deposits, transfers, airtime, withdrawals** (`DepositFundsResponse` family) — success:
+
 ```ts
 {
   Status: "OK",
@@ -220,6 +249,7 @@ Concrete objects each call resolves to. Absent optional fields are omitted (neve
 ```
 
 Same calls — business failure (returned, not thrown):
+
 ```ts
 {
   Status: "FAILED",
@@ -232,6 +262,7 @@ Same calls — business failure (returned, not thrown):
 ```
 
 **Transaction status** (`TransactionCheckStatusResponse`) — success carries the money fields:
+
 ```ts
 {
   Status: "OK",
@@ -249,6 +280,7 @@ Same calls — business failure (returned, not thrown):
 ```
 
 Still pending — keep polling:
+
 ```ts
 {
   Status: "OK",
@@ -259,6 +291,7 @@ Still pending — keep polling:
 ```
 
 **Balance** (`AcctBalanceResponse`):
+
 ```ts
 {
   Status: "OK",
@@ -271,6 +304,7 @@ Still pending — keep polling:
 ```
 
 **Ministatement** (`MinistatementResponse`) — `Transactions` is always an array:
+
 ```ts
 {
   Status: "OK",
@@ -302,6 +336,7 @@ Still pending — keep polling:
 ```
 
 **Airtimestock purchase** (`PurchaseAirtimeStockResponse`):
+
 ```ts
 {
   Status: "OK",
@@ -314,6 +349,7 @@ Still pending — keep polling:
 ```
 
 **KYC lookup** (`MsisdnKycInfoResponse`):
+
 ```ts
 {
   Status: "OK",
@@ -326,6 +362,7 @@ Still pending — keep polling:
 ```
 
 **Verified payment notification** (`PaymentNotificationResult`):
+
 ```ts
 {
   is_verified: true,
@@ -339,6 +376,7 @@ Still pending — keep polling:
 ```
 
 Unverifiable notification (bad signature or cert problem) — credit nothing:
+
 ```ts
 {
   is_verified: false,
@@ -352,6 +390,7 @@ Unverifiable notification (bad signature or cert problem) — credit nothing:
 ```
 
 **Transport failure** — thrown as `YoAPIError`, e.g. gateway HTTP 502:
+
 ```ts
 // caught error instance:
 YoAPIError: Yo! Payments gateway responded with HTTP 502
@@ -363,18 +402,20 @@ YoAPIError: Yo! Payments gateway responded with HTTP 502
 ## Usage cases
 
 **1. Blocking deposit** — simplest collection flow; the call returns after the subscriber approves:
+
 ```ts
 const api = new YoAPI(u, p, "sandbox");
 api.setExternalReference(`INV-${Date.now()}`);
 const res = await api.acDepositFunds("256770000000", 10000, "Order payment");
 if (res.Status === "OK" && res.TransactionStatus === "SUCCEEDED") {
-    await markPaid(res.TransactionReference!);
+  await markPaid(res.TransactionReference!);
 } else {
-    console.error(res.ErrorMessageCode, res.ErrorMessage);
+  console.error(res.ErrorMessageCode, res.ErrorMessage);
 }
 ```
 
 **2. Non-blocking deposit with IPN + polling fallback** — instant response, then confirm:
+
 ```ts
 api.setNonblocking("TRUE");
 api.setInstantNotificationUrl("https://example.com/api/yo/ipn");
@@ -383,19 +424,27 @@ const res = await api.acDepositFunds("256770000000", 10000, "Order payment");
 // ...meanwhile your IPN endpoint verifies and credits on payment.external_ref...
 // ...and/or poll until settled:
 for (;;) {
-    const st = await api.acTransactionCheckStatus(null, externalRef);
-    if (st.TransactionStatus !== "PENDING") break;
-    await new Promise((r) => setTimeout(r, 5000));
+  const st = await api.acTransactionCheckStatus(null, externalRef);
+  if (st.TransactionStatus !== "PENDING") break;
+  await new Promise((r) => setTimeout(r, 5000));
 }
 ```
 
 **3. Daily reconciliation from the ministatement:**
+
 ```ts
-const st = await api.acGetMinistatement("2026-09-10 00:00:00", "2026-09-10 23:59:59", "SUCCEEDED", "UGX-MTNMM", 0);
+const st = await api.acGetMinistatement(
+  "2026-09-10 00:00:00",
+  "2026-09-10 23:59:59",
+  "SUCCEEDED",
+  "UGX-MTNMM",
+  0,
+);
 for (const tx of st.Transactions) await reconcile(tx);
 ```
 
 **4. Serverless payout with key material (no key files on Vercel/Lambda):**
+
 ```ts
 api.setExternalReference("SAL-SEP-001");
 api.setPublicKeyAuthenticationNonce(crypto.randomUUID());
@@ -411,22 +460,24 @@ PHP reads `$_POST` / `php://input` globals, which is impossible in TypeScript, s
 ```ts
 // Bun HTTP server example
 Bun.serve({
-    port: 3000,
-    async fetch(req) {
-        const form = await req.formData();
-        const body = Object.fromEntries(form.entries()) as any;
+  port: 3000,
+  async fetch(req) {
+    const form = await req.formData();
+    const body = Object.fromEntries(form.entries()) as any;
 
-        const yoAPI = new YoAPI("API_USERNAME", "API_PASSWORD", "sandbox");
-        const payment = yoAPI.receivePaymentNotification(body);
-        if (payment.is_verified) {
-            console.log(`Payment from ${payment.msisdn} of ${payment.amount} (ref ${payment.external_ref})`);
-            // update your transaction status where external_ref = payment.external_ref
-        }
+    const yoAPI = new YoAPI("API_USERNAME", "API_PASSWORD", "sandbox");
+    const payment = yoAPI.receivePaymentNotification(body);
+    if (payment.is_verified) {
+      console.log(
+        `Payment from ${payment.msisdn} of ${payment.amount} (ref ${payment.external_ref})`,
+      );
+      // update your transaction status where external_ref = payment.external_ref
+    }
 
-        // Failure notifications:
-        // const failure = yoAPI.receivePaymentFailureNotification(body);
-        return new Response("OK");
-    },
+    // Failure notifications:
+    // const failure = yoAPI.receivePaymentFailureNotification(body);
+    return new Response("OK");
+  },
 });
 ```
 
@@ -444,7 +495,11 @@ import "server-only";
 import { YoAPI } from "@herberthtk/yo-payments-api";
 
 export function getYoClient() {
-    return new YoAPI(process.env.YO_API_USERNAME!, process.env.YO_API_PASSWORD!, "sandbox");
+  return new YoAPI(
+    process.env.YO_API_USERNAME!,
+    process.env.YO_API_PASSWORD!,
+    "sandbox",
+  );
 }
 ```
 
@@ -453,27 +508,18 @@ export function getYoClient() {
 import "server-only";
 import { getYoClient } from "@/lib/yo";
 
-export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
-    const form = await req.formData();
-    const body: Record<string, string> = {};
-    for (const [k, v] of form.entries()) if (typeof v === "string") body[k] = v;
+  const form = await req.formData();
+  const body = Object.fromEntries(form.entries()) as any;
+  const payment = getYoClient().receivePaymentNotification(body);
+  if (!payment.is_verified)
+    return new Response("NOT VERIFIED", { status: 400 });
 
-    const payment = getYoClient().receivePaymentNotification({
-        date_time: body.date_time ?? "",
-        amount: body.amount ?? "",
-        narrative: body.narrative ?? "",
-        network_ref: body.network_ref ?? "",
-        external_ref: body.external_ref ?? "",
-        msisdn: body.msisdn ?? "",
-        signature: body.signature ?? "",
-    });
-    if (!payment.is_verified) return new Response("NOT VERIFIED", { status: 400 });
-
-    // TODO: persist + mark processed idempotently on payment.external_ref
-    return new Response("OK");
+  // TODO: persist + mark processed idempotently on payment.external_ref
+  return new Response("OK");
 }
 ```
 
@@ -482,12 +528,17 @@ export async function POST(req: Request) {
 "use server";
 import { getYoClient } from "@/lib/yo";
 
-export async function requestDeposit(msisdn: string, amount: number, narrative: string) {
-    const api = getYoClient();
-    api.setExternalReference(`${Date.now()}`);
-    const res = await api.acDepositFunds(msisdn, amount, narrative);
-    if (res.Status === "OK") return { ok: true, reference: res.TransactionReference };
-    return { ok: false, message: res.StatusMessage };
+export async function requestDeposit(
+  msisdn: string,
+  amount: number,
+  narrative: string,
+) {
+  const api = getYoClient();
+  api.setExternalReference(`${Date.now()}`);
+  const res = await api.acDepositFunds(msisdn, amount, narrative);
+  if (res.Status === "OK")
+    return { ok: true, reference: res.TransactionReference };
+  return { ok: false, message: res.StatusMessage };
 }
 ```
 
@@ -496,8 +547,14 @@ export async function requestDeposit(msisdn: string, amount: number, narrative: 
 import { getYoClient } from "@/lib/yo";
 
 export default async function StatementPage() {
-    const res = await getYoClient().acGetMinistatement(null, null, "SUCCEEDED", "UGX-MTNMM", 0);
-    return <pre>{JSON.stringify(res.Transactions, null, 2)}</pre>;
+  const res = await getYoClient().acGetMinistatement(
+    null,
+    null,
+    "SUCCEEDED",
+    "UGX-MTNMM",
+    0,
+  );
+  return <pre>{JSON.stringify(res.Transactions, null, 2)}</pre>;
 }
 ```
 
@@ -511,11 +568,11 @@ Transport-level and protocol-level failures throw `YoAPIError` (an `Error` subcl
 import { YoAPI, YoAPIError } from "@herberthtk/yo-payments-api";
 
 try {
-    await yoAPI.acAcctBalance();
+  await yoAPI.acAcctBalance();
 } catch (e) {
-    if (e instanceof YoAPIError) {
-        console.error(e.message, "status:", e.status, "cause:", e.cause);
-    }
+  if (e instanceof YoAPIError) {
+    console.error(e.message, "status:", e.status, "cause:", e.cause);
+  }
 }
 ```
 
@@ -566,7 +623,7 @@ The suite (`tests/YoAPI.test.ts`, `tests/examples.test.ts`, `tests/keys.test.ts`
 
 ### Releasing (maintainers)
 
-Versions follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:` → minor, `fix:` → patch, `feat!:`/`BREAKING CHANGE:` → major). To cut a release, run **Actions → Release → Run workflow** — release-it bumps the version, updates `CHANGELOG.md`, tags, creates the GitHub release and publishes to npm via trusted publishing (no npm token needed). First-time setup only: `npm login` + one manual `npm publish --access public`, then register the repo as a trusted publisher in the npm package settings.
+Versions follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:` → minor, `fix:` → patch, `feat!:`/`BREAKING CHANGE:` → major). Before the first release, configure npm trusted publishing for `@herberthtk/yo-payments-api` in npm package settings: select GitHub Actions, set the repository to `herberthk/yo-payments-api`, and set the workflow filename to `release.yml` (not its full path). See npm's [trusted publishers guide](https://docs.npmjs.com/trusted-publishers/) for the full setup. Then run **Actions → Release → Run workflow** — release-it bumps the version, updates `CHANGELOG.md`, tags, creates the GitHub release and publishes to npm via trusted publishing (no npm token needed).
 
 ## Project structure
 
