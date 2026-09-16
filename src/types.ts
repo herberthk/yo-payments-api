@@ -1,6 +1,7 @@
 export type NonBlocking = "TRUE" | "FALSE";
 export type DepositTransactionType = "PULL" | "PUSH";
 export type YoMode = "production" | "sandbox";
+export type YoTransactionStatus = "SUCCEEDED" | "FAILED" | "PENDING" | "INDETERMINATE";
 
 export interface PaymentNotificationBody {
     date_time: string;
@@ -38,7 +39,7 @@ export interface DepositFundsResponse {
     Status: string;
     StatusCode: string;
     StatusMessage: string;
-    TransactionStatus: string;
+    TransactionStatus: YoTransactionStatus;
     ErrorMessageCode?: string;
     ErrorMessage?: string;
     TransactionReference?: string;
@@ -73,7 +74,7 @@ export interface AcctBalanceResponse {
 export interface TransactionDetail {
     TransactionSystemId: string;
     TransactionReference: string;
-    TransactionStatus: string;
+    TransactionStatus: YoTransactionStatus;
     InitiationDate: string;
     CompletionDate: string;
     NarrativeBase64: string;

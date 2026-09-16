@@ -29,6 +29,7 @@ import type {
     TransactionCheckStatusResponse,
     TransactionDetail,
     YoMode,
+    YoTransactionStatus,
 } from "./types.ts";
 import {
     XML_HEADER,
@@ -383,7 +384,7 @@ export class YoAPI {
             Status: str(response.Status),
             StatusCode: str(response.StatusCode),
             StatusMessage: str(response.StatusMessage),
-            TransactionStatus: str(response.TransactionStatus),
+            TransactionStatus: str(response.TransactionStatus) as YoTransactionStatus,
         };
         setIfNonEmpty(result, "ErrorMessageCode", str(response.ErrorMessageCode));
         setIfNonEmpty(result, "ErrorMessage", str(response.ErrorMessage));
@@ -418,7 +419,7 @@ export class YoAPI {
             Status: str(response.Status),
             StatusCode: str(response.StatusCode),
             StatusMessage: str(response.StatusMessage),
-            TransactionStatus: str(response.TransactionStatus),
+            TransactionStatus: str(response.TransactionStatus) as YoTransactionStatus,
         };
         setIfNonEmpty(result, "ErrorMessageCode", str(response.ErrorMessageCode));
         setIfNonEmpty(result, "ErrorMessage", str(response.ErrorMessage));
@@ -467,7 +468,7 @@ export class YoAPI {
             Status: str(response.Status),
             StatusCode: str(response.StatusCode),
             StatusMessage: str(response.StatusMessage),
-            TransactionStatus: str(response.TransactionStatus),
+            TransactionStatus: str(response.TransactionStatus) as YoTransactionStatus,
         };
         setIfNonEmpty(result, "ErrorMessageCode", str(response.ErrorMessageCode));
         setIfNonEmpty(result, "ErrorMessage", str(response.ErrorMessage));
@@ -553,7 +554,7 @@ export class YoAPI {
             const detail: TransactionDetail = {
                 TransactionSystemId: str(node.TransactionSystemId),
                 TransactionReference: str(node.TransactionReference),
-                TransactionStatus: str(node.TransactionStatus),
+                TransactionStatus: str(node.TransactionStatus) as YoTransactionStatus,
                 InitiationDate: str(node.InitiationDate),
                 CompletionDate: str(node.CompletionDate),
                 NarrativeBase64: str(asArray(node.NarrativeBase64)[0]),
@@ -604,7 +605,7 @@ export class YoAPI {
             Status: str(response.Status),
             StatusCode: str(response.StatusCode),
             StatusMessage: str(response.StatusMessage),
-            TransactionStatus: str(response.TransactionStatus),
+            TransactionStatus: str(response.TransactionStatus) as YoTransactionStatus,
         };
         setIfNotNull(result, "ErrorMessageCode", response.ErrorMessageCode);
         setIfNotNull(result, "ErrorMessage", response.ErrorMessage);
@@ -648,7 +649,7 @@ export class YoAPI {
             Status: str(response.Status),
             StatusCode: str(response.StatusCode),
             StatusMessage: str(response.StatusMessage),
-            TransactionStatus: str(response.TransactionStatus),
+            TransactionStatus: str(response.TransactionStatus) as YoTransactionStatus,
         };
         setIfNotNull(result, "ErrorMessageCode", response.ErrorMessageCode);
         setIfNotNull(result, "ErrorMessage", response.ErrorMessage);
@@ -689,7 +690,7 @@ export class YoAPI {
             Status: str(response.Status),
             StatusCode: str(response.StatusCode),
             StatusMessage: str(response.StatusMessage),
-            TransactionStatus: str(response.TransactionStatus),
+            TransactionStatus: str(response.TransactionStatus) as YoTransactionStatus,
         };
         setIfNonEmpty(result, "ErrorMessageCode", str(response.ErrorMessageCode));
         setIfNonEmpty(result, "ErrorMessage", str(response.ErrorMessage));
